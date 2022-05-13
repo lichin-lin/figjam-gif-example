@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Widget Template</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="./main.tsx"></script>
+</body>
+
+</html>
+<script>
+  window.onmessage = async (event) => {
+    if (event.data.pluginMessage.type === 'networkRequest') {
+      const request = new XMLHttpRequest()
+      const { keyword } = event.data.pluginMessage
+
+      // get a random gif
+      const _ = await fetch(`https://api.giphy.com/v1/gifs/random?api_key=0UTRbFtkMxAplrohufYco5IY74U8hOes&tag=${keyword}`)
+      const res = await _.json()
+      const { data } = res
+
+      if (data) {
+        const { height, width, url } = data?.images?.downsized
+        console.log({ height, width, url });
+
+        const _ = await fetch(url)
+          .then((r) => r.blob())
+          .then((data) => {
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+              const blob = new Blob([reader.result]);
+              const blobUrl = URL.createObjectURL(blob);
+              const blobBuffer = await blob.arrayBuffer();
+              // console.log("File read: ", blob, blobBuffer);
+
+              const img = new Image();
+              img.onload = () => {
+                console.log('!');
+                parent.postMessage(
+                  {
+                    pluginMessage: {
+                      type: "send-gif",
+                      value: {
+                        width: img.naturalWidth,
+                        height: img.naturalHeight,
+                        imgSrc: new Uint8Array(blobBuffer),
+                      },
+                    },
+                  },
+                  "*"
+                );
+              };
+              img.src = blobUrl;
+            }
+            reader.readAsArrayBuffer(data);
+          })
+      }
+      
+      window.parent.postMessage({ pluginMessage: request.response }, '*')
+    }
+  }
+</script>
